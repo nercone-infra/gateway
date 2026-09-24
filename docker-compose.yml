@@ -1,0 +1,134 @@
+services:
+  ruconet:
+    container_name: gateway-ruconet
+    image: ghcr.io/nercone-infra/ruconet-node:latest
+    restart: unless-stopped
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: 1
+      net.ipv4.conf.all.src_valid_mark: 1
+    dns:
+      - 127.0.0.1
+    dns_opt:
+      - trust-ad
+    ports:
+      - "22:22/tcp"
+      - "25:25/tcp"
+      - "80:80/tcp"
+      - "143:143/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+      - "465:465/tcp"
+      - "587:587/tcp"
+      - "993:993/tcp"
+    environment:
+      - RUCONET_NAME=gateway
+      - RUCONET_DIRECT=all
+      - RUCONET_PRIVATE_KEY=${RUCONET_PRIVATE_KEY:?RUCONET_PRIVATE_KEY is required}
+      - RUCONET_PRESHARED_KEY=${RUCONET_PRESHARED_KEY:?RUCONET_PRESHARED_KEY is required}
+      - RUCONET_HUB_PUBLIC_KEY=${RUCONET_HUB_PUBLIC_KEY:?RUCONET_HUB_PUBLIC_KEY is required}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ruconet-node", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  egress:
+    container_name: gateway-egress
+    build:
+      context: .
+      target: egress
+    restart: unless-stopped
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    network_mode: service:ruconet
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      ruconet:
+        condition: service_started
+        restart: true
+
+  cert:
+    container_name: gateway-cert
+    image: ghcr.io/nercone-infra/ruconet-cert:latest
+    restart: unless-stopped
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    network_mode: service:ruconet
+    volumes:
+      - ./data/certs:/etc/certs
+    environment:
+      - CERT_BUNDLES=ruconet letsencrypt
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/cert-agent", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      ruconet:
+        condition: service_started
+        restart: true
+
+  proxy:
+    container_name: gateway-proxy
+    build:
+      context: .
+      target: proxy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    network_mode: service:ruconet
+    volumes:
+      - ./proxy/etc:/etc/nginx:ro
+      - ./data/certs:/etc/certs:ro
+      - ./data/ech:/var/lib/ech:ro
+      - ./data/log:/var/log/nginx
+    depends_on:
+      ruconet:
+        condition: service_started
+        restart: true
+
+  onion:
+    container_name: gateway-onion
+    build:
+      context: .
+      target: onion
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    network_mode: service:ruconet
+    volumes:
+      - ./onion/etc:/etc/tor.d:ro
+      - ./data/onion:/var/lib/tor
+    depends_on:
+      ruconet:
+        condition: service_started
+        restart: true
+
+networks:
+  default:
+    enable_ipv6: true
