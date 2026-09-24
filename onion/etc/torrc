@@ -8,10 +8,11 @@ SocksPort 0
 
 HiddenServiceDir /var/lib/tor/main
 HiddenServiceVersion 3
+HiddenServiceExportCircuitID haproxy
 
 # Proxy
-HiddenServicePort 22  127.0.0.1:9022
-HiddenServicePort 25  127.0.0.1:9025
-HiddenServicePort 80  127.0.0.1:9080
-HiddenServicePort 143 127.0.0.1:9143
-HiddenServicePort 587 127.0.0.1:9587
+HiddenServicePort 22  [::1]:9022
+HiddenServicePort 25  [::1]:9025
+HiddenServicePort 80  [::1]:9080
+HiddenServicePort 143 [::1]:9143
+HiddenServicePort 587 [::1]:9587
