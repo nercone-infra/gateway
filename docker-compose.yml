@@ -1,7 +1,8 @@
 services:
   ruconet:
     container_name: gateway-ruconet
-    image: ghcr.io/nercone-infra/ruconet-node:latest
+    image: ghcr.io/nercone-infra/ruconet:latest
+    command: ["/usr/local/bin/ruconet-node"]
     restart: unless-stopped
     init: true
     logging:
